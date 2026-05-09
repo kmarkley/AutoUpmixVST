@@ -1,4 +1,4 @@
-# AutoUpmix
+# AutoUpmixVST
 
 A VST3 audio plugin that automatically upmixes a stereo (2-channel) signal to 5.1 or 3-channel output. Designed for use on a Raspberry Pi hosted by the **Hang Loose Host** application.
 
