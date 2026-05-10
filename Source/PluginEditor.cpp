@@ -89,7 +89,7 @@ AutoUpmixAudioProcessorEditor::AutoUpmixAudioProcessorEditor (AutoUpmixAudioProc
 {
     // ── Plugin window size ────────────────────────────────────────────────────
     // Sized for comfortable display on a Raspberry Pi with a small monitor.
-    setSize (480, 420);
+    setSize (480, 450);
 
     // ── Bypass toggle ─────────────────────────────────────────────────────────
     addAndMakeVisible (bypassToggle);
@@ -113,6 +113,19 @@ AutoUpmixAudioProcessorEditor::AutoUpmixAudioProcessorEditor (AutoUpmixAudioProc
 
     gainAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         p.apvts, ParamID::UpmixGain, gainSlider);
+
+    // ── Silence hold slider ───────────────────────────────────────────────────
+    holdSlider.setSliderStyle (juce::Slider::LinearHorizontal);
+    holdSlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 60, 20);
+    holdSlider.setTextValueSuffix (" s");
+    addAndMakeVisible (holdSlider);
+
+    holdLabel.setText ("Hold Time", juce::dontSendNotification);
+    holdLabel.attachToComponent (&holdSlider, true);
+    addAndMakeVisible (holdLabel);
+
+    holdAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+        p.apvts, ParamID::SilenceHold, holdSlider);
 
     // ── Upmix status label ────────────────────────────────────────────────────
     upmixStatusLabel.setJustificationType (juce::Justification::centred);
@@ -158,6 +171,10 @@ void AutoUpmixAudioProcessorEditor::resized()
 
     // Gain slider: label lives to the left (attached), slider fills rest
     gainSlider.setBounds     (margin + labelW, y, W - margin - labelW - margin, ctrlH);
+    y += ctrlSpaceY;
+
+    // Hold time slider
+    holdSlider.setBounds     (margin + labelW, y, W - margin - labelW - margin, ctrlH);
     y += ctrlSpaceY;
 
     upmixStatusLabel.setBounds (margin, y, W - 2 * margin, ctrlH);

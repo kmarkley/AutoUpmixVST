@@ -57,6 +57,8 @@ private:
     juce::ToggleButton  surroundToggle  { "Upmix to Surround" };
     juce::Slider        gainSlider;
     juce::Label         gainLabel;
+    juce::Slider        holdSlider;
+    juce::Label         holdLabel;
 
     // ── Status indicator ─────────────────────────────────────────────────────
     juce::Label         upmixStatusLabel;
@@ -65,6 +67,7 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>  bypassAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>  surroundAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>  gainAttach;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>  holdAttach;
 
     // ── Level meters ─────────────────────────────────────────────────────────
     // [0..7] = inputs, [8..15] = outputs; matches processorRef.meterLevels indexing.

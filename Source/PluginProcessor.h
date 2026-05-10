@@ -26,6 +26,7 @@ namespace ParamID {
     static constexpr auto Bypass       = "bypass";
     static constexpr auto UpmixSurr    = "upmix_surround";
     static constexpr auto UpmixGain    = "upmix_gain";
+    static constexpr auto SilenceHold  = "silence_hold";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,10 +116,14 @@ private:
     /// Compute peak over a buffer channel and decay previous peak.
     float updatePeak (float currentPeak, const float* data, int numSamples) noexcept;
 
+    // ── Silence hold: prevents upmix toggling on brief dips below threshold ─────
+    double mSampleRate      = 44100.0; // stored in prepareToPlay
+    int    mSilenceSamples  = 0;       // running count of consecutive silent samples
+
     // ── Upmix matrix coefficients (pre-computed, constant) ───────────────────
     // See spec / http://elias.altervista.org/html/3_speaker_matrix.html
-    static constexpr float kScale_5_6     =  5.0f / 6.0f;          // ≈ -1.6 dB
-    static constexpr float kScale_1_6     =  1.0f / 6.0f;          // ≈ -15.6 dB
+    static constexpr float kScale_5_6      =  5.0f / 6.0f;         // ≈ -1.6 dB
+    static constexpr float kScale_1_6      =  1.0f / 6.0f;         // ≈ -15.6 dB
     static constexpr float kScale_sqrt10_6 = 1.054092553f;          // sqrt(10)/6 ≈ -5.6 dB
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AutoUpmixAudioProcessor)

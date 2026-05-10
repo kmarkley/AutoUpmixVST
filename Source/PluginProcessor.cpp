@@ -27,6 +27,15 @@ AutoUpmixAudioProcessor::createParameterLayout()
         juce::AudioParameterFloatAttributes()
             .withLabel ("dB")));
 
+    // Silence hold: 0 … 2 s, default 0.3 s
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        ParamID::SilenceHold,
+        "Silence Hold",
+        juce::NormalisableRange<float> (0.0f, 2.0f, 0.01f),
+        0.3f,
+        juce::AudioParameterFloatAttributes()
+            .withLabel ("s")));
+
     return layout;
 }
 
@@ -65,10 +74,12 @@ bool AutoUpmixAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts
 // Prepare / Release
 // ─────────────────────────────────────────────────────────────────────────────
 
-void AutoUpmixAudioProcessor::prepareToPlay (double /*sampleRate*/, int /*samplesPerBlock*/)
+void AutoUpmixAudioProcessor::prepareToPlay (double sampleRate, int /*samplesPerBlock*/)
 {
     mInputPeaks.fill  (0.0f);
     mOutputPeaks.fill (0.0f);
+    mSampleRate    = sampleRate;
+    mSilenceSamples = 0;
 }
 
 void AutoUpmixAudioProcessor::releaseResources() {}
@@ -143,10 +154,24 @@ void AutoUpmixAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     for (int ch = Ch::LFE; ch < Ch::Count; ++ch)
         auxSignalPresent |= hasSignal[ch];
 
+    // ── Silence hold: keep upmix active briefly after stereo signal drops ────
+    // Prevents FL/FR gain steps and CC dropouts on quiet passages.
+    const float holdSecs    = apvts.getRawParameterValue (ParamID::SilenceHold)->load();
+    const int   holdSamples = static_cast<int> (mSampleRate * holdSecs);
+
+    bool stereoHasSignal = hasSignal[Ch::FL] || hasSignal[Ch::FR];
+    if (stereoHasSignal)
+        mSilenceSamples = 0;
+    else
+        mSilenceSamples += numSamples;
+
+    bool heldActive  = (mSilenceSamples < holdSamples);
+    bool shouldUpmix = stereoHasSignal || heldActive;
+
     // ── Passthrough conditions ────────────────────────────────────────────────
     // 1. Aux signal present → don't upmix, leave buffer in-place.
-    // 2. No signal at all   → same: leave buffer in-place.
-    if (auxSignalPresent || (!hasSignal[Ch::FL] && !hasSignal[Ch::FR]))
+    // 2. Stereo silent beyond hold window → same: leave buffer in-place.
+    if (auxSignalPresent || !shouldUpmix)
     {
         upmixActive.store (false, std::memory_order_relaxed);
         for (int ch = 0; ch < Ch::Count; ++ch)
