@@ -23,10 +23,11 @@ namespace Ch {
 // Parameter IDs — used for AudioProcessorValueTreeState and persistence.
 // ─────────────────────────────────────────────────────────────────────────────
 namespace ParamID {
-    static constexpr auto Bypass       = "bypass";
-    static constexpr auto UpmixSurr    = "upmix_surround";
-    static constexpr auto UpmixGain    = "upmix_gain";
-    static constexpr auto SilenceHold  = "silence_hold";
+    static constexpr auto Bypass           = "bypass";
+    static constexpr auto UpmixSurr        = "upmix_surround";
+    static constexpr auto UpmixGain        = "upmix_gain";
+    static constexpr auto SilenceHold      = "silence_hold";
+    static constexpr auto SilenceThreshold = "silence_threshold";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -44,15 +45,13 @@ namespace ParamID {
 class SignalDetector
 {
 public:
-    static constexpr float kThresholdLinear = 1.0e-5f;  ///< −100 dBFS
-
-    /// Returns true if any sample in [data, data+numSamples) exceeds the
+    /// Returns true if any sample in [data, data+numSamples) exceeds
     /// threshold in absolute value.  No state is mutated; safe to call from
     /// the real-time audio thread without locking.
-    static bool hasSignal (const float* data, int numSamples) noexcept
+    static bool hasSignal (const float* data, int numSamples, float threshold) noexcept
     {
         for (int i = 0; i < numSamples; ++i)
-            if (std::abs (data[i]) > kThresholdLinear)
+            if (std::abs (data[i]) > threshold)
                 return true;
         return false;
     }

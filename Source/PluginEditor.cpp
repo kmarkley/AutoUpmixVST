@@ -89,7 +89,7 @@ AutoUpmixAudioProcessorEditor::AutoUpmixAudioProcessorEditor (AutoUpmixAudioProc
 {
     // ── Plugin window size ────────────────────────────────────────────────────
     // Sized for comfortable display on a Raspberry Pi with a small monitor.
-    setSize (480, 450);
+    setSize (480, 480);
 
     // ── Bypass toggle ─────────────────────────────────────────────────────────
     addAndMakeVisible (bypassToggle);
@@ -126,6 +126,19 @@ AutoUpmixAudioProcessorEditor::AutoUpmixAudioProcessorEditor (AutoUpmixAudioProc
 
     holdAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         p.apvts, ParamID::SilenceHold, holdSlider);
+
+    // ── Signal threshold slider ───────────────────────────────────────────────
+    thresholdSlider.setSliderStyle (juce::Slider::LinearHorizontal);
+    thresholdSlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 60, 20);
+    thresholdSlider.setTextValueSuffix (" dBFS");
+    addAndMakeVisible (thresholdSlider);
+
+    thresholdLabel.setText ("Threshold", juce::dontSendNotification);
+    thresholdLabel.attachToComponent (&thresholdSlider, true);
+    addAndMakeVisible (thresholdLabel);
+
+    thresholdAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+        p.apvts, ParamID::SilenceThreshold, thresholdSlider);
 
     // ── Upmix status label ────────────────────────────────────────────────────
     upmixStatusLabel.setJustificationType (juce::Justification::centred);
@@ -174,7 +187,11 @@ void AutoUpmixAudioProcessorEditor::resized()
     y += ctrlSpaceY;
 
     // Hold time slider
-    holdSlider.setBounds     (margin + labelW, y, W - margin - labelW - margin, ctrlH);
+    holdSlider.setBounds      (margin + labelW, y, W - margin - labelW - margin, ctrlH);
+    y += ctrlSpaceY;
+
+    // Signal threshold slider
+    thresholdSlider.setBounds (margin + labelW, y, W - margin - labelW - margin, ctrlH);
     y += ctrlSpaceY;
 
     upmixStatusLabel.setBounds (margin, y, W - 2 * margin, ctrlH);

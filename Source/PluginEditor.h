@@ -59,6 +59,8 @@ private:
     juce::Label         gainLabel;
     juce::Slider        holdSlider;
     juce::Label         holdLabel;
+    juce::Slider        thresholdSlider;
+    juce::Label         thresholdLabel;
 
     // ── Status indicator ─────────────────────────────────────────────────────
     juce::Label         upmixStatusLabel;
@@ -68,6 +70,7 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>  surroundAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>  gainAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>  holdAttach;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>  thresholdAttach;
 
     // ── Level meters ─────────────────────────────────────────────────────────
     // [0..7] = inputs, [8..15] = outputs; matches processorRef.meterLevels indexing.

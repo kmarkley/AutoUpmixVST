@@ -36,6 +36,15 @@ AutoUpmixAudioProcessor::createParameterLayout()
         juce::AudioParameterFloatAttributes()
             .withLabel ("s")));
 
+    // Signal threshold: -120 … -40 dBFS, default -100 dBFS
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        ParamID::SilenceThreshold,
+        "Signal Threshold",
+        juce::NormalisableRange<float> (-120.0f, -40.0f, 1.0f),
+        -100.0f,
+        juce::AudioParameterFloatAttributes()
+            .withLabel ("dBFS")));
+
     return layout;
 }
 
@@ -145,9 +154,12 @@ void AutoUpmixAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     }
 
     // ── Signal detection — per-block absolute peak, one-block latency ────────
+    const float thresholdDB     = apvts.getRawParameterValue (ParamID::SilenceThreshold)->load();
+    const float thresholdLinear = juce::Decibels::decibelsToGain (thresholdDB);
+
     std::array<bool, Ch::Count> hasSignal {};
     for (int ch = 0; ch < numChannels; ++ch)
-        hasSignal[ch] = SignalDetector::hasSignal (buffer.getReadPointer (ch), numSamples);
+        hasSignal[ch] = SignalDetector::hasSignal (buffer.getReadPointer (ch), numSamples, thresholdLinear);
 
     // Check if any auxiliary channel (2–7) carries signal.
     bool auxSignalPresent = false;
