@@ -81,6 +81,9 @@ private:
         "FL", "FR", "LFE", "CC", "SL", "SR", "CH6", "CH7"
     };
 
+    // ── Tooltip support ───────────────────────────────────────────────────────
+    juce::TooltipWindow tooltipWindow { this, 600 };  ///< 600 ms hover delay
+
     // ── Timer ─────────────────────────────────────────────────────────────────
     void timerCallback() override;
 

@@ -95,16 +95,20 @@ AutoUpmixAudioProcessorEditor::AutoUpmixAudioProcessorEditor (AutoUpmixAudioProc
     addAndMakeVisible (bypassToggle);
     bypassAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         p.apvts, ParamID::Bypass, bypassToggle);
+    bypassToggle.setTooltip ("Pass all channels through unchanged, disabling upmix processing.");
 
     // ── Surround toggle ───────────────────────────────────────────────────────
     addAndMakeVisible (surroundToggle);
     surroundAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         p.apvts, ParamID::UpmixSurr, surroundToggle);
+    surroundToggle.setTooltip ("When on, derives Center and Surround channels from the stereo input. "
+                               "When off, widens the stereo image across FL, FR, and CC only.");
 
     // ── Gain slider ───────────────────────────────────────────────────────────
     gainSlider.setSliderStyle (juce::Slider::LinearHorizontal);
     gainSlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 60, 20);
     gainSlider.setTextValueSuffix (" dB");
+    gainSlider.setTooltip ("Output level of the upmixed channels relative to the input signal.");
     addAndMakeVisible (gainSlider);
 
     gainLabel.setText ("Upmix Gain", juce::dontSendNotification);
@@ -118,6 +122,8 @@ AutoUpmixAudioProcessorEditor::AutoUpmixAudioProcessorEditor (AutoUpmixAudioProc
     holdSlider.setSliderStyle (juce::Slider::LinearHorizontal);
     holdSlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 60, 20);
     holdSlider.setTextValueSuffix (" s");
+    holdSlider.setTooltip ("How long the upmix stays active after stereo signal drops below the threshold. "
+                           "Prevents dropouts and level jumps during brief quiet passages.");
     addAndMakeVisible (holdSlider);
 
     holdLabel.setText ("Hold Time", juce::dontSendNotification);
@@ -131,6 +137,8 @@ AutoUpmixAudioProcessorEditor::AutoUpmixAudioProcessorEditor (AutoUpmixAudioProc
     thresholdSlider.setSliderStyle (juce::Slider::LinearHorizontal);
     thresholdSlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 60, 20);
     thresholdSlider.setTextValueSuffix (" dBFS");
+    thresholdSlider.setTooltip ("Level below which a channel is considered silent. "
+                                "Raise if the upmix triggers on noise; lower if it misses quiet signals.");
     addAndMakeVisible (thresholdSlider);
 
     thresholdLabel.setText ("Threshold", juce::dontSendNotification);
