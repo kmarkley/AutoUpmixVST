@@ -90,8 +90,9 @@ void AutoUpmixAudioProcessor::prepareToPlay (double sampleRate, int /*samplesPer
 {
     mInputPeaks.fill  (0.0f);
     mOutputPeaks.fill (0.0f);
-    mSampleRate    = sampleRate;
-    mSilenceSamples = 0;
+    mSampleRate        = sampleRate;
+    mSilenceSamples    = 0;
+    mAuxSilenceSamples = 0;
 }
 
 void AutoUpmixAudioProcessor::releaseResources() {}
@@ -164,16 +165,12 @@ void AutoUpmixAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     for (int ch = 0; ch < numChannels; ++ch)
         hasSignal[ch] = SignalDetector::hasSignal (buffer.getReadPointer (ch), numSamples, thresholdLinear);
 
-    // Check if any auxiliary channel (2–7) carries signal.
-    bool auxSignalPresent = false;
-    for (int ch = Ch::LFE; ch < Ch::Count; ++ch)
-        auxSignalPresent |= hasSignal[ch];
-
     // ── Silence hold: keep upmix active briefly after stereo signal drops ────
     // Prevents FL/FR gain steps and CC dropouts on quiet passages.
     const float holdSecs    = apvts.getRawParameterValue (ParamID::SilenceHold)->load();
     const int   holdSamples = static_cast<int> (mSampleRate * holdSecs);
 
+    // Stereo hold: upmix → passthrough
     bool stereoHasSignal = hasSignal[Ch::FL] || hasSignal[Ch::FR];
     if (stereoHasSignal)
         mSilenceSamples = 0;
@@ -183,8 +180,21 @@ void AutoUpmixAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     bool heldActive  = (mSilenceSamples < holdSamples);
     bool shouldUpmix = stereoHasSignal || heldActive;
 
+    // Aux hold: passthrough → upmix. Treat aux as "present" until hold expires
+    // to avoid spurious upmix activations during brief quiet passages on ch 2-7.
+    bool auxHasSignal = false;
+    for (int ch = Ch::LFE; ch < Ch::Count; ++ch)
+        auxHasSignal |= hasSignal[ch];
+
+    if (auxHasSignal)
+        mAuxSilenceSamples = 0;
+    else
+        mAuxSilenceSamples += numSamples;
+
+    bool auxSignalPresent = auxHasSignal || (mAuxSilenceSamples < holdSamples);
+
     // ── Passthrough conditions ────────────────────────────────────────────────
-    // 1. Aux signal present → don't upmix, leave buffer in-place.
+    // 1. Aux signal present (or held) → don't upmix, leave buffer in-place.
     // 2. Stereo silent beyond hold window → same: leave buffer in-place.
     if (auxSignalPresent || !shouldUpmix)
     {

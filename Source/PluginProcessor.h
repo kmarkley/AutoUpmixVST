@@ -119,8 +119,9 @@ private:
     float updatePeak (float currentPeak, const float* data, int numSamples) noexcept;
 
     // ── Silence hold: prevents upmix toggling on brief dips below threshold ─────
-    double mSampleRate      = 44100.0; // stored in prepareToPlay
-    int    mSilenceSamples  = 0;       // running count of consecutive silent samples
+    double mSampleRate         = 44100.0; // stored in prepareToPlay
+    int    mSilenceSamples     = 0;       // stereo FL/FR silence counter (upmix → passthrough)
+    int    mAuxSilenceSamples  = 0;       // aux ch 2-7 silence counter (passthrough → upmix)
 
     // ── Upmix matrix coefficients (pre-computed, constant) ───────────────────
     // See spec / http://elias.altervista.org/html/3_speaker_matrix.html
