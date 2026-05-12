@@ -64,6 +64,9 @@ private:
     juce::Label         holdLabel;
     juce::Slider        thresholdSlider;
     juce::Label         thresholdLabel;
+    juce::ToggleButton  xoverToggle     { "Freq-Split Upmix" };
+    juce::Slider        xoverFreqSlider;
+    juce::Label         xoverFreqLabel;
 
     // ── Status indicator ─────────────────────────────────────────────────────
     juce::Label         upmixStatusLabel;
@@ -74,6 +77,8 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>  gainAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>  holdAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>  thresholdAttach;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>  xoverAttach;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>  xoverFreqAttach;
 
     // ── Level meters ─────────────────────────────────────────────────────────
     // [0..7] = inputs, [8..15] = outputs; matches processorRef.meterLevels indexing.

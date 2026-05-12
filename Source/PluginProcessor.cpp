@@ -48,6 +48,19 @@ AutoUpmixAudioProcessor::createParameterLayout()
         juce::AudioParameterFloatAttributes()
             .withLabel ("dBFS")));
 
+    // Crossover enable
+    layout.add (std::make_unique<juce::AudioParameterBool> (
+        ParamID::XoverEnable, "Freq-Split Upmix", false));
+
+    // Crossover frequency: 40 … 160 Hz, default 80 Hz
+    layout.add (std::make_unique<juce::AudioParameterFloat> (
+        ParamID::XoverFreq,
+        "Crossover Freq",
+        juce::NormalisableRange<float> (40.0f, 160.0f, 1.0f),
+        80.0f,
+        juce::AudioParameterFloatAttributes()
+            .withLabel ("Hz")));
+
     return layout;
 }
 
@@ -86,13 +99,37 @@ bool AutoUpmixAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts
 // Prepare / Release
 // ─────────────────────────────────────────────────────────────────────────────
 
-void AutoUpmixAudioProcessor::prepareToPlay (double sampleRate, int /*samplesPerBlock*/)
+void AutoUpmixAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     mInputPeaks.fill  (0.0f);
     mOutputPeaks.fill (0.0f);
     mSampleRate        = sampleRate;
+    mSamplesPerBlock   = samplesPerBlock;
     mSilenceSamples    = 0;
     mAuxSilenceSamples = 0;
+    mLastXoverFreq     = -1.0f;
+    mPrevXoverEnabled  = false;
+
+    // Assign valid order-2 coefficients before prepare() so the state array
+    // is sized correctly (prepare calls reset, which reads filter order).
+    auto lpCoeffs = juce::dsp::IIR::Coefficients<float>::makeLowPass  (sampleRate, 80.0);
+    auto hpCoeffs = juce::dsp::IIR::Coefficients<float>::makeHighPass (sampleRate, 80.0);
+
+    mXoverFL_lp1.coefficients = mXoverFL_lp2.coefficients =
+    mXoverFR_lp1.coefficients = mXoverFR_lp2.coefficients = lpCoeffs;
+
+    mXoverFL_hp1.coefficients = mXoverFL_hp2.coefficients =
+    mXoverFR_hp1.coefficients = mXoverFR_hp2.coefficients = hpCoeffs;
+
+    const juce::dsp::ProcessSpec spec {
+        sampleRate,
+        static_cast<juce::uint32> (samplesPerBlock),
+        1u
+    };
+    mXoverFL_lp1.prepare (spec);  mXoverFL_lp2.prepare (spec);
+    mXoverFR_lp1.prepare (spec);  mXoverFR_lp2.prepare (spec);
+    mXoverFL_hp1.prepare (spec);  mXoverFL_hp2.prepare (spec);
+    mXoverFR_hp1.prepare (spec);  mXoverFR_hp2.prepare (spec);
 }
 
 void AutoUpmixAudioProcessor::releaseResources() {}
@@ -210,6 +247,34 @@ void AutoUpmixAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // ── Upmix is active ───────────────────────────────────────────────────────
     upmixActive.store (true, std::memory_order_relaxed);
 
+    // ── Crossover parameter snapshot ─────────────────────────────────────────
+    const bool  wantXover = apvts.getRawParameterValue (ParamID::XoverEnable)->load() > 0.5f;
+    const float xoverFreq = apvts.getRawParameterValue (ParamID::XoverFreq)->load();
+
+    // Reset filter state on false→true transition to avoid stale-data click.
+    if (wantXover && !mPrevXoverEnabled)
+    {
+        mXoverFL_lp1.reset();  mXoverFL_lp2.reset();
+        mXoverFR_lp1.reset();  mXoverFR_lp2.reset();
+        mXoverFL_hp1.reset();  mXoverFL_hp2.reset();
+        mXoverFR_hp1.reset();  mXoverFR_hp2.reset();
+        mLastXoverFreq = -1.0f;
+    }
+    mPrevXoverEnabled = wantXover;
+
+    // Update LP and HP coefficients only when the crossover frequency changes.
+    if (wantXover && xoverFreq != mLastXoverFreq)
+    {
+        const double fc = juce::jlimit (40.0, 160.0, static_cast<double> (xoverFreq));
+        auto lp = juce::dsp::IIR::Coefficients<float>::makeLowPass  (mSampleRate, fc);
+        auto hp = juce::dsp::IIR::Coefficients<float>::makeHighPass (mSampleRate, fc);
+        *mXoverFL_lp1.coefficients = *lp;  *mXoverFL_lp2.coefficients = *lp;
+        *mXoverFR_lp1.coefficients = *lp;  *mXoverFR_lp2.coefficients = *lp;
+        *mXoverFL_hp1.coefficients = *hp;  *mXoverFL_hp2.coefficients = *hp;
+        *mXoverFR_hp1.coefficients = *hp;  *mXoverFR_hp2.coefficients = *hp;
+        mLastXoverFreq = xoverFreq;
+    }
+
     // Grab read pointers to the original input samples before we start
     // overwriting the buffer.  Copy FL and FR to temporary vectors so we
     // have stable source data throughout the matrix multiplication.
@@ -239,6 +304,64 @@ void AutoUpmixAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         if (gainLinear != 1.0f)
             buffer.applyGain (ch, 0, numSamples, gainLinear);
     };
+
+    // Run src through two cascaded Butterworth biquad stages; write result to out.
+    // Used for both LP and HP chains — the filter objects determine the band.
+    auto applyLR4 = [&] (const float* src, float* out,
+                          juce::dsp::IIR::Filter<float>& s1,
+                          juce::dsp::IIR::Filter<float>& s2)
+    {
+        for (int i = 0; i < numSamples; ++i)
+            out[i] = s2.processSample (s1.processSample (src[i]));
+    };
+
+    if (wantXover)
+    {
+        // ── Compute LP and HP bands via independent LR4 filter chains ─────────
+        std::vector<float> flLp (numSamples), frLp (numSamples);
+        std::vector<float> flHp (numSamples), frHp (numSamples);
+        applyLR4 (flIn.data(), flLp.data(), mXoverFL_lp1, mXoverFL_lp2);
+        applyLR4 (frIn.data(), frLp.data(), mXoverFR_lp1, mXoverFR_lp2);
+        applyLR4 (flIn.data(), flHp.data(), mXoverFL_hp1, mXoverFL_hp2);
+        applyLR4 (frIn.data(), frHp.data(), mXoverFR_hp1, mXoverFR_hp2);
+
+        if (wantSurr)
+        {
+            // ── Freq-split surround upmix ─────────────────────────────────────
+            // FLo = LP(FLi) + kScale_5_6 * HP(FLi)
+            mix2  (buffer.getWritePointer (Ch::FL), flLp.data(), 1.0f, flHp.data(), kScale_5_6);
+            mix2  (buffer.getWritePointer (Ch::FR), frLp.data(), 1.0f, frHp.data(), kScale_5_6);
+            zero  (Ch::LFE);
+            mix2  (buffer.getWritePointer (Ch::CC),
+                   flHp.data(), kScale_sqrt10_6, frHp.data(), kScale_sqrt10_6);
+            scale (buffer.getWritePointer (Ch::SL), frHp.data(), -kScale_1_6);
+            scale (buffer.getWritePointer (Ch::SR), flHp.data(), -kScale_1_6);
+            zero  (Ch::CH6);
+            zero  (Ch::CH7);
+        }
+        else
+        {
+            // ── Freq-split stereo-widening upmix ──────────────────────────────
+            // FLo = LP(FLi) + kScale_5_6 * HP(FLi) − kScale_1_6 * HP(FRi)
+            mix2  (buffer.getWritePointer (Ch::FL), flLp.data(), 1.0f, flHp.data(), kScale_5_6);
+            juce::FloatVectorOperations::addWithMultiply (
+                   buffer.getWritePointer (Ch::FL), frHp.data(), -kScale_1_6, numSamples);
+
+            mix2  (buffer.getWritePointer (Ch::FR), frLp.data(), 1.0f, frHp.data(), kScale_5_6);
+            juce::FloatVectorOperations::addWithMultiply (
+                   buffer.getWritePointer (Ch::FR), flHp.data(), -kScale_1_6, numSamples);
+
+            zero  (Ch::LFE);
+            mix2  (buffer.getWritePointer (Ch::CC),
+                   flHp.data(), kScale_sqrt10_6, frHp.data(), kScale_sqrt10_6);
+            zero  (Ch::SL);
+            zero  (Ch::SR);
+            zero  (Ch::CH6);
+            zero  (Ch::CH7);
+        }
+    }
+    else  // xover disabled — original path, zero filter overhead
+    {
 
     if (wantSurr)
     {
@@ -292,6 +415,7 @@ void AutoUpmixAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         zero  (Ch::CH6);
         zero  (Ch::CH7);
     }
+    } // end xover-disabled else
 
     // Apply upmix gain to all output channels
     for (int ch = 0; ch < Ch::Count; ++ch)

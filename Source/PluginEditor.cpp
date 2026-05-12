@@ -92,7 +92,7 @@ AutoUpmixAudioProcessorEditor::AutoUpmixAudioProcessorEditor (AutoUpmixAudioProc
 {
     // ── Plugin window size ────────────────────────────────────────────────────
     // Sized for comfortable display on a Raspberry Pi with a small monitor.
-    setSize (480, 480);
+    setSize (480, 540);
 
     // ── Bypass toggle ─────────────────────────────────────────────────────────
     addAndMakeVisible (bypassToggle);
@@ -151,6 +151,30 @@ AutoUpmixAudioProcessorEditor::AutoUpmixAudioProcessorEditor (AutoUpmixAudioProc
     thresholdAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         p.apvts, ParamID::SilenceThreshold, thresholdSlider);
 
+    // ── Crossover enable toggle ───────────────────────────────────────────────
+    addAndMakeVisible (xoverToggle);
+    xoverAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
+        p.apvts, ParamID::XoverEnable, xoverToggle);
+    xoverToggle.setTooltip ("Split the stereo input at the crossover frequency. "
+                            "Low frequencies pass through to FL/FR at unity gain; "
+                            "the upmix matrix is applied to the high-frequency band only.");
+
+    // ── Crossover frequency slider ────────────────────────────────────────────
+    xoverFreqSlider.setSliderStyle (juce::Slider::LinearHorizontal);
+    xoverFreqSlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 60, 20);
+    xoverFreqSlider.setTextValueSuffix (" Hz");
+    xoverFreqSlider.setTooltip ("Crossover frequency for freq-split upmix mode (40–160 Hz). "
+                                "Frequencies below this point pass to FL/FR at full gain; "
+                                "above it the upmix matrix is applied.");
+    addAndMakeVisible (xoverFreqSlider);
+
+    xoverFreqLabel.setText ("Crossover", juce::dontSendNotification);
+    xoverFreqLabel.attachToComponent (&xoverFreqSlider, true);
+    addAndMakeVisible (xoverFreqLabel);
+
+    xoverFreqAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+        p.apvts, ParamID::XoverFreq, xoverFreqSlider);
+
     // ── Upmix status label ────────────────────────────────────────────────────
     upmixStatusLabel.setJustificationType (juce::Justification::centred);
     upmixStatusLabel.setFont (juce::Font (14.0f, juce::Font::bold));
@@ -203,6 +227,14 @@ void AutoUpmixAudioProcessorEditor::resized()
 
     // Signal threshold slider
     thresholdSlider.setBounds (margin + labelW, y, W - margin - labelW - margin, ctrlH);
+    y += ctrlSpaceY;
+
+    // Crossover enable toggle
+    xoverToggle.setBounds (margin, y, W - 2 * margin, ctrlH);
+    y += ctrlSpaceY;
+
+    // Crossover frequency slider
+    xoverFreqSlider.setBounds (margin + labelW, y, W - margin - labelW - margin, ctrlH);
     y += ctrlSpaceY;
 
     upmixStatusLabel.setBounds (margin, y, W - 2 * margin, ctrlH);

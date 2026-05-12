@@ -31,6 +31,8 @@ namespace ParamID {
     static constexpr auto UpmixGain        = "upmix_gain";
     static constexpr auto SilenceHold      = "silence_hold";
     static constexpr auto SilenceThreshold = "silence_threshold";
+    static constexpr auto XoverEnable      = "xover_enable";
+    static constexpr auto XoverFreq        = "xover_freq";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -122,6 +124,16 @@ private:
     double mSampleRate         = 44100.0; // stored in prepareToPlay
     int    mSilenceSamples     = 0;       // stereo FL/FR silence counter (upmix → passthrough)
     int    mAuxSilenceSamples  = 0;       // aux ch 2-7 silence counter (passthrough → upmix)
+
+    // ── LR4 crossover filters (two cascaded Butterworth stages per channel) ──
+    // LP and HP are independent filter chains; both use Q = 1/√2 (Butterworth).
+    juce::dsp::IIR::Filter<float> mXoverFL_lp1, mXoverFL_lp2;  ///< FL low-pass chain
+    juce::dsp::IIR::Filter<float> mXoverFR_lp1, mXoverFR_lp2;  ///< FR low-pass chain
+    juce::dsp::IIR::Filter<float> mXoverFL_hp1, mXoverFL_hp2;  ///< FL high-pass chain
+    juce::dsp::IIR::Filter<float> mXoverFR_hp1, mXoverFR_hp2;  ///< FR high-pass chain
+    float mLastXoverFreq    = -1.0f;  // sentinel: force coeff write on first block
+    bool  mPrevXoverEnabled = false;  // tracks false→true transition for state reset
+    int   mSamplesPerBlock  = 512;    // captured in prepareToPlay for ProcessSpec
 
     // ── Upmix matrix coefficients (pre-computed, constant) ───────────────────
     // See spec / http://elias.altervista.org/html/3_speaker_matrix.html
