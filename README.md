@@ -1,6 +1,10 @@
 # AutoUpmixVST
 
-A VST3 audio plugin that automatically upmixes a stereo (2-channel) signal to 5.1 or 3-channel output. Designed for use on a Raspberry Pi hosted by the **Hang Loose Host** application.
+A VST3 audio plugin that automatically upmixes a stereo (2-channel) signal to 5- or 3-channel output. Bass management (if any) is assumed to be handled downstream.
+
+Inspired by: <https://github.com/itsalic/StereoToSurroundUpmixer>  
+
+Designed for use on a Raspberry Pi.  Untested on other platforms.
 
 ---
 
@@ -10,6 +14,7 @@ A VST3 audio plugin that automatically upmixes a stereo (2-channel) signal to 5.
 - **Two upmix modes**:
   - *Surround* — derives FL, FR, CC, SL, SR from the stereo source
   - *Wide stereo* — derives FL, FR, CC with enhanced stereo separation (no surround channels)
+- **Upmix crossover** — optionaly only apply upmix matrix to upper frequency band, leaving lower frequency band in FL and FR only.
 - **Bypass** — hard passthrough, zero processing
 - **Upmix gain** — trim the upmixed signal from −24 dB to 0 dB
 - **16 level meters** — input and output for each of the 8 channels, with peak-hold display
@@ -71,8 +76,7 @@ else:
 | CH6o   | 0                       |
 | CH7o   | 0                       |
 
-Matrix based on: <http://elias.altervista.org/html/3_speaker_matrix.html>  
-Inspired by: <https://github.com/itsalic/StereoToSurroundUpmixer>
+Upmix matrix based on: <http://elias.altervista.org/html/3_speaker_matrix.html>  
 
 ---
 
@@ -100,13 +104,13 @@ The compiled `.vst3` bundle appears under `build/AutoUpmix_artefacts/Release/VST
 
 ### Installing on Raspberry Pi
 
-Copy the `.vst3` bundle to the VST3 search path used by Hang Loose Host:
+Copy the `.vst3` bundle to the VST3 search path used by host:
 
 ```bash
 cp -r build/AutoUpmix_artefacts/Release/VST3/AutoUpmix.vst3 ~/.vst3/
 ```
 
-Then rescan plugins in Hang Loose Host.
+Then rescan plugins in host.
 
 ---
 
@@ -124,7 +128,7 @@ git submodule update --init --recursive
 ## Project Structure
 
 ```
-AutoUpmix/
+AutoUpmixVST/
 ├── CMakeLists.txt          ← build system
 ├── Source/
 │   ├── PluginProcessor.h   ← audio engine (signal detection, upmix matrix)
@@ -140,4 +144,4 @@ AutoUpmix/
 
 ## License
 
-MIT — see `LICENSE` for details.
+GPL v3 — see `LICENSE` for details. This project links against JUCE, which is licensed under the GNU General Public License v3.
